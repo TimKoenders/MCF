@@ -157,18 +157,15 @@ dtm_df$date3<-as.numeric(paste(substr(dtm_df$date1,1,4),substr(dtm_df$date1,5,6)
 
 
 
-
-
-
 #### Sentiment Analysis with Vader------------------------------------------------------
 
 inspect(corpus)
+?vader_df
 
 # Extract the text content from the corpus
 text_vector <- sapply(corpus, function(x) { as.character(x) })
 sentiment <- vader_df(text_vector)
 print(sentiment)
-
 
 # Create a new column 'document_id' and extract the first 5 digits from the row names
 sentiment$document_id <- as.numeric(row.names(sentiment))
@@ -178,18 +175,32 @@ sentiment$document_id <- substr(as.character(sentiment$document_id), 1, 5)
 setDT(sentiment)
 
 # Calculate weighted positive, negative, and total occurrences for each document
-document_sentiment <- sentiment[, .(weighted_pos = sum(pos),
-                                    weighted_neg = sum(neg),
-                                    weighted_total = sum(but_count)),
+document_sentiment <- sentiment[, .(total_pos = sum(pos),
+                                    total_neg = sum(neg),
+                                    total = sum(but_count)),
                                 by = document_id]
 
 # Calculate sentiment scores using the formula
-document_sentiment$sentiment_score <- (document_sentiment$weighted_pos - document_sentiment$weighted_neg) / document_sentiment$weighted_total
+document_sentiment$sentiment_score <- (document_sentiment$total_pos - document_sentiment$total_neg) / document_sentiment$total
 
 # View the resulting data frame
 print(document_sentiment)
 
 
+##### Sentiment Analysis with Vader using Word Scores --------------------
+
+sentiment$word_scores <- gsub("\\{|\\}", "", sentiment$word_scores) # remove brackets
+sentiment$word_scores <- as.numeric(sentiment$word_scores) # convert to numeric
+
+# Create a new data.table for document-level sentiment
+document_sentiment_ws <- sentiment[, .(weighted_pos = sum(pos * word_scores),
+                                    weighted_neg = sum(neg * word_scores)),
+                                by = document_id]
 
 
+# Calculate sentiment scores using the formula
+document_sentiment_ws$sentiment_score <- (document_sentiment_ws$weighted_pos - document_sentiment_ws$weighted_neg) / document_sentiment$total
+
+# View the resulting data frame
+print(document_sentiment_ws)
 
