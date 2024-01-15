@@ -34,7 +34,7 @@ setwd("C:/Users/koend/OneDrive/Bureaublad/WU 2023-2024/Courses/Seminar MCF/Proje
 list.files()
 
 
-#### Data Processing ---------------------------------------------------------
+#### Data processing ---------------------------------------------------------
 
 news_url <- read.csv2("smallcorpus.csv", header=TRUE, sep=";", 
                       stringsAsFactors=FALSE, colClasses=c("character","character"))
@@ -157,7 +157,7 @@ dtm_df$date3<-as.numeric(paste(substr(dtm_df$date1,1,4),substr(dtm_df$date1,5,6)
 
 
 
-#### Sentiment Analysis with Vader------------------------------------------------------
+#### Sentiment analysis with vader------------------------------------------------------
 
 inspect(corpus)
 ?vader_df
@@ -187,7 +187,7 @@ document_sentiment$sentiment_score <- (document_sentiment$total_pos - document_s
 print(document_sentiment)
 
 
-##### Sentiment Analysis with Vader using Word Scores --------------------
+##### Sentiment analysis with vader using Word Scores --------------------
 
 sentiment$word_scores <- gsub("\\{|\\}", "", sentiment$word_scores) # remove brackets
 sentiment$word_scores <- as.numeric(sentiment$word_scores) # convert to numeric

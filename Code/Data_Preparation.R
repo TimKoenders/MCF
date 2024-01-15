@@ -130,10 +130,34 @@ df <- create_lag_variables(df, "CommodityIndex", lags)
 # Create lag variables for VIX
 df <- create_lag_variables(df, "VIX", lags)
 
+# Problem: missing days in asset price data are exactly those dates for which we have sentiment scores.
+date_sequence <- seq(as.Date(min(df$DATE), format="%Y-%m-%d"), as.Date(max(df$DATE), format="%Y-%m-%d"), by="day")
+# Convert 'DATE' column to Date type
+df$DATE <- as.Date(df$DATE, format="%Y-%m-%d")
+
+# Perform a left join to fill in missing dates with NA values
+df <- data.frame(DATE = date_sequence) %>%
+  left_join(df, by = "DATE")
+
+# Now load sentiment scores and merge
+scores <- read.csv("scores.csv")
+head(scores)
+head(df)
+
+# Convert 'DATE' column to character type
+df$DATE <- as.character(df$DATE)
+
+# Perform a left join
+df_overall <- left_join(df, scores, by = c("DATE" = "date"))
+
+# Create lag variables for sentiment scores
+df_overall <- create_lag_variables(df_overall, "sentiment_score", lags)
+df_overall <- create_lag_variables(df_overall, "sentiment_score_ws", lags)
+
 #### Write CSV -----------------------------------------------------------
 # Define the file path
 file_path <- "C:/Users/koend/OneDrive/Bureaublad/WU 2023-2024/Courses/Seminar MCF/Project_MCF/MCF/CSV/df_overall.csv"
 
 # Write the DataFrame to a CSV file
-write.csv(df, file = file_path, row.names = FALSE)
+write.csv(df_overall, file = file_path, row.names = FALSE)
 
