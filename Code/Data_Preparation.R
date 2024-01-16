@@ -25,7 +25,8 @@ packages <- c("dplyr",
               "malaytextr",
               "vader",
               "schrute",
-              "data.table"
+              "data.table",
+              "zoo"
 )
 
 ipak(packages)
@@ -84,9 +85,6 @@ df <- df[, c("DATE", "NASDAQCOM", "CommodityIndex", "VIX")]
 # View
 head(df)
 
-
-
-
 #### Data preparation ----------------------------------------------------
 # Convert "NASDAQCOM" to numeric, handling possible commas in the data
 df$NASDAQCOM <- as.numeric(gsub(",", "", df$NASDAQCOM))
@@ -100,6 +98,8 @@ returns <- c(NA, diff(df$NASDAQCOM) / lag(df$NASDAQCOM, default = df$NASDAQCOM[1
 # Add daily returns to the data frame
 df$returns <- returns[1:nrow(df)]
 
+take_for_impute <- df
+
 ## Create cumulative responses of returns
 
 # Set the number of days
@@ -111,24 +111,6 @@ for (i in 1:days) {
     sum(df$returns[row:min(nrow(df), row + i - 1)], na.rm = TRUE)
   })
 }
-
-## Create lags of other variables
-# Function to create lag variables
-create_lag_variables <- function(df, column_name, lags) {
-  for (i in 1:lags) {
-    df[[paste0(column_name, "_Lag_", i)]] <- lag(df[[column_name]], n = i)
-  }
-  return(df)
-}
-
-# Set the number of lags
-lags <- 8
-
-# Create lag variables for CommodityIndex
-df <- create_lag_variables(df, "CommodityIndex", lags)
-
-# Create lag variables for VIX
-df <- create_lag_variables(df, "VIX", lags)
 
 # Problem: missing days in asset price data are exactly those dates for which we have sentiment scores.
 date_sequence <- seq(as.Date(min(df$DATE), format="%Y-%m-%d"), as.Date(max(df$DATE), format="%Y-%m-%d"), by="day")
@@ -143,16 +125,30 @@ df <- data.frame(DATE = date_sequence) %>%
 scores <- read.csv("scores.csv")
 head(scores)
 head(df)
+df <-merge(df, scores, by.x = "DATE", by.y = "date", all.x = TRUE)
 
-# Convert 'DATE' column to character type
-df$DATE <- as.character(df$DATE)
+## Create lags of other variables
+# Function to create lag variables
+create_lag_variables <- function(df, column_name, lags) {
+  for (i in 1:lags) {
+    df[[paste0(column_name, "_Lag_", i)]] <- lag(df[[column_name]], n = i)
+  }
+  return(df)
+}
 
-# Perform a left join
-df_overall <- left_join(df, scores, by = c("DATE" = "date"))
+# Set the number of lags
+lags <- 5
 
-# Create lag variables for sentiment scores
+# Create lag variables for CommodityIndex
+df_overall <- create_lag_variables(df, "CommodityIndex", lags)
+
+# Create lag variables for VIX
+df_overall <- create_lag_variables(df_overall, "VIX", lags)
+
+# Create lag variables for sentiment scores and articles
 df_overall <- create_lag_variables(df_overall, "sentiment_score", lags)
 df_overall <- create_lag_variables(df_overall, "sentiment_score_ws", lags)
+df_overall <- create_lag_variables(df_overall, "art", lags)
 
 #### Write CSV -----------------------------------------------------------
 # Define the file path
@@ -160,4 +156,78 @@ file_path <- "C:/Users/koend/OneDrive/Bureaublad/WU 2023-2024/Courses/Seminar MC
 
 # Write the DataFrame to a CSV file
 write.csv(df_overall, file = file_path, row.names = FALSE)
+
+
+#### Imputation ----------------------------------------------------------
+## Impute returns and control data
+
+df_no <- take_for_impute
+
+# Specify the columns you want to fill
+columns_to_fill <- c("NASDAQCOM", "CommodityIndex", "VIX", "returns")
+
+# Problem: missing days in asset price data are exactly those dates for which we have sentiment scores.
+date_sequence <- seq(as.Date(min(df_no$DATE), format="%Y-%m-%d"), as.Date(max(df_no$DATE), format="%Y-%m-%d"), by="day")
+# Convert 'DATE' column to Date type
+df_no$DATE <- as.Date(df_no$DATE, format="%Y-%m-%d")
+
+# Here we make sure the dataframe has all days and just sets missing value to the empty cells
+df_no$DATE <- as.Date(df_no$DATE)
+date_df <- data.frame(DATE = as.Date(date_sequence))
+df_no <- left_join(date_df, df_no, by = "DATE")
+
+# Print the updated dataframe
+head(df_no)
+
+# Apply the zoo::na.locf function to fill missing values
+df_no[, columns_to_fill] <- lapply(df_no[, columns_to_fill], function(x) zoo::na.locf(x, na.rm = FALSE))
+
+# Set the number of days
+days <- 8  # 
+
+# Create cumulative response variables
+for (i in 1:days) {
+  df_no[[paste0("Cum_Res_", i, "d")]] <- sapply(1:nrow(df_no), function(row) {
+    sum(df_no$returns[row:min(nrow(df_no), row + i - 1)], na.rm = TRUE)
+  })
+}
+
+# Now load sentiment scores and merge
+scores <- read.csv("scores.csv")
+head(scores)
+head(df_no)
+df_no<-merge(df_no, scores, by.x = "DATE", by.y = "date", all.x = TRUE)
+
+## Create lags of other variables
+# Function to create lag variables
+create_lag_variables <- function(df, column_name, lags) {
+  for (i in 1:lags) {
+    df[[paste0(column_name, "_Lag_", i)]] <- lag(df[[column_name]], n = i)
+  }
+  return(df)
+}
+
+# Set the number of lags
+lags <- 5
+
+# Create lag variables for CommodityIndex
+df_overall_imp<- create_lag_variables(df_no, "CommodityIndex", lags)
+
+# Create lag variables for VIX
+df_overall_imp <- create_lag_variables(df_overall_imp, "VIX", lags)
+
+# Create lag variables for sentiment scores and articles
+df_overall_imp <- create_lag_variables(df_overall_imp, "sentiment_score", lags)
+df_overall_imp <- create_lag_variables(df_overall_imp, "sentiment_score_ws", lags)
+df_overall_imp <-create_lag_variables(df_overall_imp, "art", lags)
+
+#### Write CSV for imputed values file-----------------------------------------------------------
+# Define the file path
+file_path <- "C:/Users/koend/OneDrive/Bureaublad/WU 2023-2024/Courses/Seminar MCF/Project_MCF/MCF/CSV/df_overall_imp.csv"
+
+# Write the DataFrame to a CSV file
+write.csv(df_overall_imp, file = file_path, row.names = FALSE)
+
+
+
 
