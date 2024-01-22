@@ -230,4 +230,34 @@ write.csv(df_overall_imp, file = file_path, row.names = FALSE)
 
 
 
+#### Imputation of sentiment scores ------------------------------------------
+summary(df_overall_imp)
+
+# Identify columns containing sentiment scores
+sentiment_columns <- colnames(df_overall_imp)[grep("sentiment_score", colnames(df_overall_imp))]
+
+# Standardize sentiment scores, excluding NAs
+for (col in sentiment_columns) {
+  non_na_indices <- !is.na(df_overall_imp[[col]])
+  
+  if (any(non_na_indices)) {
+    mean_val <- mean(df_overall_imp[[col]][non_na_indices])
+    sd_val <- sd(df_overall_imp[[col]][non_na_indices])
+    df_overall_imp[[col]][non_na_indices] <- (df_overall_imp[[col]][non_na_indices] - mean_val) / sd_val
+  }
+}
+
+# Replace missing values with 0
+df_overall_imp[is.na(df_overall_imp)] <- 0
+
+df_overall_imp_sen <- df_overall_imp
+
+#### Write CSV for imputed values file (now also with imputed sentiments cores)-----------------------------------------------------------
+# Define the file path
+file_path <- "C:/Users/koend/OneDrive/Bureaublad/WU 2023-2024/Courses/Seminar MCF/Project_MCF/MCF/CSV/df_overall_imp_sen.csv"
+
+# Write the DataFrame to a CSV file
+write.csv(df_overall_imp_sen, file = file_path, row.names = FALSE)
+
+
 
